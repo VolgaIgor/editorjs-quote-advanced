@@ -1,16 +1,15 @@
 /**
- * Image Tool for the Editor.js
+ * Advanced Quote Tool for the Editor.js
  *
- * @author CodeX <team@codex.so>
+ * @author Igor Shuvalov «VolgaIgor»
  * @license MIT
- * @see {@link https://github.com/editor-js/image}
+ * @see {@link https://github.com/VolgaIgor/editorjs-quote-advanced}
  *
  * To developers.
  * To simplify Tool structure, we split it to 4 parts:
  *  1) index.js — main Tool's interface, public API and methods for working with data
  *  2) uploader.js — module that has methods for sending files via AJAX: from device, by URL or File pasting
  *  3) ui.js — module for UI manipulations: render, showing preloader, etc
- *  4) tunes.js — working with Block Tunes: render buttons, handle clicks
  *
  * For debug purposes there is a testing server
  * that can save uploaded files and return a Response {@link UploadResponseFormat}
@@ -20,40 +19,37 @@
  * It will expose 8008 port, so you can pass http://localhost:8008 with the Tools config:
  *
  * image: {
- *   class: ImageTool,
+ *   class: QuoteAdvanced,
  *   config: {
  *     endpoints: {
  *       byFile: 'http://localhost:8008/uploadFile',
- *       byUrl: 'http://localhost:8008/fetchUrl',
  *     }
  *   },
  * },
  */
 
 /**
- * @typedef {object} ImageToolData
- * @description Image Tool's input and output data format
- * @property {string} caption — image caption
- * @property {boolean} withBorder - should image be rendered with border
- * @property {boolean} withBackground - should image be rendered with background
- * @property {boolean} stretched - should image be stretched to full width of container
+ * @typedef {object} QuoteAdvancedToolData
+ * @description Quote Advanced Tool's input and output data format
+ * @property {string} quote — quote text
+ * @property {string} authorName — quote author name
+ * @property {string} authorInfo — information about quote author
  * @property {object} file — Image file data returned from backend
- * @property {string} file.url — image URL
+ * @property {string} file.url — author image URL
  */
 
-import './index.css';
+import './index.pcss';
 
 import Ui from './ui';
 import Uploader from './uploader';
 
-import { IconAddBorder, IconStretch, IconAddBackground, IconPicture } from '@codexteam/icons';
+import { IconQuote } from '@codexteam/icons';
 
 /**
  * @typedef {object} ImageConfig
  * @description Config supported by Tool
  * @property {object} endpoints - upload endpoints
  * @property {string} endpoints.byFile - upload by file
- * @property {string} endpoints.byUrl - upload by URL
  * @property {string} field - field name for uploaded image
  * @property {string} types - available mime-types
  * @property {string} captionPlaceholder - placeholder for Caption field
@@ -62,7 +58,6 @@ import { IconAddBorder, IconStretch, IconAddBackground, IconPicture } from '@cod
  * @property {string} buttonContent - overrides for Select File button
  * @property {object} [uploader] - optional custom uploader
  * @property {function(File): Promise.<UploadResponseFormat>} [uploader.uploadByFile] - method that upload image by File
- * @property {function(string): Promise.<UploadResponseFormat>} [uploader.uploadByUrl] - method that upload image by URL
  */
 
 /**
@@ -74,16 +69,7 @@ import { IconAddBorder, IconStretch, IconAddBackground, IconPicture } from '@cod
  *                           also can contain any additional data that will be saved and passed back
  * @property {string} file.url - [Required] image source URL
  */
-export default class ImageTool {
-  /**
-   * Notify core that read-only mode is supported
-   *
-   * @returns {boolean}
-   */
-  static get isReadOnlySupported() {
-    return true;
-  }
-
+export default class QuoteAdvanced {
   /**
    * Get Tool toolbox settings
    * icon - Tool icon's SVG
@@ -93,42 +79,14 @@ export default class ImageTool {
    */
   static get toolbox() {
     return {
-      icon: IconPicture,
-      title: 'Image',
+      icon: IconQuote,
+      title: 'Quote',
     };
   }
 
   /**
-   * Available image tools
-   *
-   * @returns {Array}
-   */
-  static get tunes() {
-    return [
-      {
-        name: 'withBorder',
-        icon: IconAddBorder,
-        title: 'With border',
-        toggle: true,
-      },
-      {
-        name: 'stretched',
-        icon: IconStretch,
-        title: 'Stretch image',
-        toggle: true,
-      },
-      {
-        name: 'withBackground',
-        icon: IconAddBackground,
-        title: 'With background',
-        toggle: true,
-      },
-    ];
-  }
-
-  /**
    * @param {object} tool - tool properties got from editor.js
-   * @param {ImageToolData} tool.data - previously saved data
+   * @param {QuoteAdvancedToolData} tool.data - previously saved data
    * @param {ImageConfig} tool.config - user config for Tool
    * @param {object} tool.api - Editor.js API
    * @param {boolean} tool.readOnly - read-only mode flag
@@ -146,7 +104,9 @@ export default class ImageTool {
       additionalRequestHeaders: config.additionalRequestHeaders || {},
       field: config.field || 'image',
       types: config.types || 'image/*',
-      captionPlaceholder: this.api.i18n.t(config.captionPlaceholder || 'Caption'),
+      quotePlaceholder: this.api.i18n.t(config.quotePlaceholder || 'Enter quote...'),
+      authorNamePlaceholder: this.api.i18n.t(config.authorNamePlaceholder || 'Author name'),
+      authorInfoPlaceholder: this.api.i18n.t(config.authorInfoPlaceholder || 'Author summary'),
       buttonContent: config.buttonContent || '',
       uploader: config.uploader || undefined,
       actions: config.actions || [],
@@ -174,7 +134,10 @@ export default class ImageTool {
           },
         });
       },
-      readOnly,
+      onDeleteFile: () => {
+        this.image = null;
+        this.ui.deleteImage();
+      },
     });
 
     /**
@@ -196,9 +159,19 @@ export default class ImageTool {
   }
 
   /**
+   * Allow to press Enter inside the Quote
+   *
+   * @public
+   * @returns {boolean}
+   */
+  static get enableLineBreaks() {
+    return true;
+  }
+
+  /**
    * Validate data: check if Image exists
    *
-   * @param {ImageToolData} savedData — data received after saving
+   * @param {QuoteAdvancedToolData} savedData — data received after saving
    * @returns {boolean} false if saved data is not correct, otherwise true
    * @public
    */
@@ -211,127 +184,18 @@ export default class ImageTool {
    *
    * @public
    *
-   * @returns {ImageToolData}
+   * @returns {QuoteAdvancedToolData}
    */
   save() {
-    const caption = this.ui.nodes.caption;
+    const quote = this.ui.nodes.quote;
+    const authorName = this.ui.nodes.authorName;
+    const authorInfo = this.ui.nodes.authorInfo;
 
-    this._data.caption = caption.innerHTML;
+    this._data.quote = quote.innerHTML;
+    this._data.authorName = authorName.value;
+    this._data.authorInfo = authorInfo.value;
 
     return this.data;
-  }
-
-  /**
-   * Returns configuration for block tunes: add background, add border, stretch image
-   *
-   * @public
-   *
-   * @returns {Array}
-   */
-  renderSettings() {
-    // Merge default tunes with the ones that might be added by user
-    // @see https://github.com/editor-js/image/pull/49
-    const tunes = ImageTool.tunes.concat(this.config.actions);
-
-    return tunes.map(tune => ({
-      icon: tune.icon,
-      label: this.api.i18n.t(tune.title),
-      name: tune.name,
-      toggle: tune.toggle,
-      isActive: this.data[tune.name],
-      onActivate: () => {
-        /* If it'a user defined tune, execute it's callback stored in action property */
-        if (typeof tune.action === 'function') {
-          tune.action(tune.name);
-
-          return;
-        }
-        this.tuneToggled(tune.name);
-      },
-    }));
-  }
-
-  /**
-   * Fires after clicks on the Toolbox Image Icon
-   * Initiates click on the Select File button
-   *
-   * @public
-   */
-  appendCallback() {
-    this.ui.nodes.fileButton.click();
-  }
-
-  /**
-   * Specify paste substitutes
-   *
-   * @see {@link https://github.com/codex-team/editor.js/blob/master/docs/tools.md#paste-handling}
-   * @returns {{tags: string[], patterns: object<string, RegExp>, files: {extensions: string[], mimeTypes: string[]}}}
-   */
-  static get pasteConfig() {
-    return {
-      /**
-       * Paste HTML into Editor
-       */
-      tags: [
-        {
-          img: { src: true },
-        },
-      ],
-      /**
-       * Paste URL of image into the Editor
-       */
-      patterns: {
-        image: /https?:\/\/\S+\.(gif|jpe?g|tiff|png|svg|webp)(\?[a-z0-9=]*)?$/i,
-      },
-
-      /**
-       * Drag n drop file from into the Editor
-       */
-      files: {
-        mimeTypes: [ 'image/*' ],
-      },
-    };
-  }
-
-  /**
-   * Specify paste handlers
-   *
-   * @public
-   * @see {@link https://github.com/codex-team/editor.js/blob/master/docs/tools.md#paste-handling}
-   * @param {CustomEvent} event - editor.js custom paste event
-   *                              {@link https://github.com/codex-team/editor.js/blob/master/types/tools/paste-events.d.ts}
-   * @returns {void}
-   */
-  async onPaste(event) {
-    switch (event.type) {
-      case 'tag': {
-        const image = event.detail.data;
-
-        /** Images from PDF */
-        if (/^blob:/.test(image.src)) {
-          const response = await fetch(image.src);
-          const file = await response.blob();
-
-          this.uploadFile(file);
-          break;
-        }
-
-        this.uploadUrl(image.src);
-        break;
-      }
-      case 'pattern': {
-        const url = event.detail.data;
-
-        this.uploadUrl(url);
-        break;
-      }
-      case 'file': {
-        const file = event.detail.file;
-
-        this.uploadFile(file);
-        break;
-      }
-    }
   }
 
   /**
@@ -344,19 +208,19 @@ export default class ImageTool {
    *
    * @private
    *
-   * @param {ImageToolData} data - data in Image Tool format
+   * @param {QuoteAdvancedToolData} data - data in Quote Advanced Tool format
    */
   set data(data) {
     this.image = data.file;
 
-    this._data.caption = data.caption || '';
-    this.ui.fillCaption(this._data.caption);
+    this._data.quote = data.quote || '';
+    this.ui.fillQuote(this._data.quote);
 
-    ImageTool.tunes.forEach(({ name: tune }) => {
-      const value = typeof data[tune] !== 'undefined' ? data[tune] === true || data[tune] === 'true' : false;
+    this._data.authorName = data.authorName || '';
+    this.ui.fillAuthorName(this._data.authorName);
 
-      this.setTune(tune, value);
-    });
+    this._data.authorInfo = data.authorInfo || '';
+    this.ui.fillAuthorInfo(this._data.authorInfo);
   }
 
   /**
@@ -364,7 +228,7 @@ export default class ImageTool {
    *
    * @private
    *
-   * @returns {ImageToolData}
+   * @returns {QuoteAdvancedToolData}
    */
   get data() {
     return this._data;
@@ -419,46 +283,6 @@ export default class ImageTool {
   }
 
   /**
-   * Callback fired when Block Tune is activated
-   *
-   * @private
-   *
-   * @param {string} tuneName - tune that has been clicked
-   * @returns {void}
-   */
-  tuneToggled(tuneName) {
-    // inverse tune state
-    this.setTune(tuneName, !this._data[tuneName]);
-  }
-
-  /**
-   * Set one tune
-   *
-   * @param {string} tuneName - {@link Tunes.tunes}
-   * @param {boolean} value - tune state
-   * @returns {void}
-   */
-  setTune(tuneName, value) {
-    this._data[tuneName] = value;
-
-    this.ui.applyTune(tuneName, value);
-
-    if (tuneName === 'stretched') {
-      /**
-       * Wait until the API is ready
-       */
-      Promise.resolve().then(() => {
-        const blockId = this.api.blocks.getCurrentBlockIndex();
-
-        this.api.blocks.stretchBlock(blockId, value);
-      })
-        .catch(err => {
-          console.error(err);
-        });
-    }
-  }
-
-  /**
    * Show preloader and upload image file
    *
    * @param {File} file - file that is currently uploading (from paste)
@@ -472,14 +296,4 @@ export default class ImageTool {
     });
   }
 
-  /**
-   * Show preloader and upload image by target url
-   *
-   * @param {string} url - url pasted
-   * @returns {void}
-   */
-  uploadUrl(url) {
-    this.ui.showPreloader(url);
-    this.uploader.uploadByUrl(url);
-  }
 }

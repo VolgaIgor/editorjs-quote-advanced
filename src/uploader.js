@@ -81,45 +81,6 @@ export default class Uploader {
    * Handle clicks on the upload file button
    * Fires ajax.post()
    *
-   * @param {string} url - image source url
-   */
-  uploadByUrl(url) {
-    let upload;
-
-    /**
-     * Custom uploading
-     */
-    if (this.config.uploader && typeof this.config.uploader.uploadByUrl === 'function') {
-      upload = this.config.uploader.uploadByUrl(url);
-
-      if (!isPromise(upload)) {
-        console.warn('Custom uploader method uploadByUrl should return a Promise');
-      }
-    } else {
-      /**
-       * Default uploading
-       */
-      upload = ajax.post({
-        url: this.config.endpoints.byUrl,
-        data: Object.assign({
-          url: url,
-        }, this.config.additionalRequestData),
-        type: ajax.contentType.JSON,
-        headers: this.config.additionalRequestHeaders,
-      }).then(response => response.body);
-    }
-
-    upload.then((response) => {
-      this.onUpload(response);
-    }).catch((error) => {
-      this.onError(error);
-    });
-  }
-
-  /**
-   * Handle clicks on the upload file button
-   * Fires ajax.post()
-   *
    * @param {File} file - file pasted by drag-n-drop
    * @param {Function} onPreview - file pasted by drag-n-drop
    */

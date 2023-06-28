@@ -43,7 +43,7 @@ module.exports = (env, argv) => {
           ],
         },
         {
-          test: /\.css$/,
+          test: /\.pcss$/,
           use: [
             'style-loader',
             'css-loader',
@@ -72,14 +72,14 @@ module.exports = (env, argv) => {
       }),
 
       new webpack.BannerPlugin({
-        banner: `Image tool\n\n@version ${VERSION}\n\n@package https://github.com/editor-js/image\n@licence MIT\n@author CodeX <https://codex.so>`,
+        banner: `Advanced Quote Tool\n\n@version ${VERSION}\n\n@package https://github.com/VolgaIgor/editorjs-quote-advanced\n@licence MIT\n@author Igor Shuvalov «VolgaIgor» & CodeX`,
       }),
     ],
     output: {
       path: path.join(__dirname, '/dist'),
       publicPath: '/',
       filename: 'bundle.js',
-      library: 'ImageTool',
+      library: 'QuoteAdvanced',
       libraryTarget: 'umd',
       libraryExport: 'default',
     },

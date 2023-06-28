@@ -1,11 +1,10 @@
-import { IconPicture } from '@codexteam/icons';
+import { IconPicture, IconTrash } from '@codexteam/icons';
 import { make } from './utils/dom';
 
 /**
  * Class for working with UI:
  *  - rendering base structure
  *  - show/hide preview
- *  - apply tune view
  */
 export default class Ui {
   /**
@@ -13,39 +12,66 @@ export default class Ui {
    * @param {object} ui.api - Editor.js API
    * @param {ImageConfig} ui.config - user config
    * @param {Function} ui.onSelectFile - callback for clicks on Select file button
-   * @param {boolean} ui.readOnly - read-only mode flag
+   * @param {Function} ui.onDeleteFile - callback for clicks on Delete file button
    */
-  constructor({ api, config, onSelectFile, readOnly }) {
+  constructor({ api, config, onSelectFile, onDeleteFile }) {
     this.api = api;
     this.config = config;
     this.onSelectFile = onSelectFile;
-    this.readOnly = readOnly;
+    this.onDeleteFile = onDeleteFile;
     this.nodes = {
       wrapper: make('div', [this.CSS.baseClass, this.CSS.wrapper]),
-      imageContainer: make('div', [ this.CSS.imageContainer ]),
-      fileButton: this.createFileButton(),
+
+      quote: make('div', [this.CSS.input, this.CSS.quote], {
+        contentEditable: true,
+        // innerHTML: this.data.quote,
+      }),
+
+      imageContainer: make('div', [this.CSS.imageContainer]),
       imageEl: undefined,
       imagePreloader: make('div', this.CSS.imagePreloader),
-      caption: make('div', [this.CSS.input, this.CSS.caption], {
-        contentEditable: !this.readOnly,
-      }),
+      fileButton: this.createFileButton(),
+      deleteButton: this.createDeleteButton(),
+
+      authorName: make('input', [this.CSS.input, this.CSS.authorName]),
+      authorInfo: make('input', [this.CSS.input, this.CSS.authorInfo]),
     };
 
     /**
      * Create base structure
      *  <wrapper>
-     *    <image-container>
-     *      <image-preloader />
-     *    </image-container>
-     *    <caption />
-     *    <select-file-button />
+     *    <quote />
+     *    <author-container>
+     *      <image-container>
+     *        <image />
+     *        <image-preloader />
+     *        <select-file-button />
+     *        <delete-image-button />
+     *      </image-container>
+     *      <container>
+     *        <author-name />
+     *        <author-info />
+     *      </container>
+     *    </author-container>
      *  </wrapper>
      */
-    this.nodes.caption.dataset.placeholder = this.config.captionPlaceholder;
     this.nodes.imageContainer.appendChild(this.nodes.imagePreloader);
-    this.nodes.wrapper.appendChild(this.nodes.imageContainer);
-    this.nodes.wrapper.appendChild(this.nodes.caption);
-    this.nodes.wrapper.appendChild(this.nodes.fileButton);
+    this.nodes.imageContainer.appendChild(this.nodes.fileButton);
+    this.nodes.imageContainer.appendChild(this.nodes.deleteButton);
+
+    let container = make('div', [this.CSS.authorInputs]);
+    this.nodes.authorName.placeholder = this.config.authorNamePlaceholder;
+    container.appendChild(this.nodes.authorName);
+    this.nodes.authorInfo.placeholder = this.config.authorInfoPlaceholder;
+    container.appendChild(this.nodes.authorInfo);
+
+    let authorContainer = make('div', [this.CSS.author]);
+    authorContainer.appendChild(this.nodes.imageContainer);
+    authorContainer.appendChild(container);
+
+    this.nodes.quote.dataset.placeholder = this.config.quotePlaceholder;
+    this.nodes.wrapper.appendChild(this.nodes.quote);
+    this.nodes.wrapper.appendChild(authorContainer);
   }
 
   /**
@@ -63,11 +89,20 @@ export default class Ui {
       /**
        * Tool's classes
        */
-      wrapper: 'image-tool',
-      imageContainer: 'image-tool__image',
-      imagePreloader: 'image-tool__image-preloader',
-      imageEl: 'image-tool__image-picture',
-      caption: 'image-tool__caption',
+      wrapper: 'quote-adv',
+
+      quote: 'quote-adv_quote',
+
+      imageContainer: 'quote-adv__image',
+      imagePreloader: 'quote-adv__image-preloader',
+      imageEl: 'quote-adv__image-picture',
+
+      author: 'quote-adv_author',
+      authorInputs: 'quote-adv_author-inputs',
+      authorName: 'quote-adv_author-name',
+      authorInfo: 'quote-adv_author-info',
+
+      deleteButton: 'quote-adv_delete-button',
     };
   };
 
@@ -109,12 +144,29 @@ export default class Ui {
    * @returns {Element}
    */
   createFileButton() {
-    const button = make('div', [ this.CSS.button ]);
+    const button = make('div', [this.CSS.button]);
 
     button.innerHTML = this.config.buttonContent || `${IconPicture} ${this.api.i18n.t('Select an Image')}`;
 
     button.addEventListener('click', () => {
       this.onSelectFile();
+    });
+
+    return button;
+  }
+
+  /**
+   * Creates upload-file button
+   *
+   * @returns {Element}
+   */
+  createDeleteButton() {
+    const button = make('div', [this.CSS.deleteButton]);
+
+    button.innerHTML = IconTrash;
+
+    button.addEventListener('click', () => {
+      this.onDeleteFile();
     });
 
     return button;
@@ -142,6 +194,12 @@ export default class Ui {
     this.toggleStatus(Ui.status.EMPTY);
   }
 
+  deleteImage() {
+    this.nodes.imageContainer.removeChild(this.nodes.imageEl);
+    this.nodes.imageEl = undefined;
+    this.toggleStatus(Ui.status.EMPTY);
+  }
+
   /**
    * Shows an image
    *
@@ -149,11 +207,6 @@ export default class Ui {
    * @returns {void}
    */
   fillImage(url) {
-    /**
-     * Check for a source extension to compose element correctly: video tag for mp4, img — for others
-     */
-    const tag = /\.mp4$/.test(url) ? 'VIDEO' : 'IMG';
-
     const attributes = {
       src: url,
     };
@@ -168,33 +221,11 @@ export default class Ui {
     let eventName = 'load';
 
     /**
-     * Update attributes and eventName if source is a mp4 video
-     */
-    if (tag === 'VIDEO') {
-      /**
-       * Add attributes for playing muted mp4 as a gif
-       *
-       * @type {boolean}
-       */
-      attributes.autoplay = true;
-      attributes.loop = true;
-      attributes.muted = true;
-      attributes.playsinline = true;
-
-      /**
-       * Change event to be listened
-       *
-       * @type {string}
-       */
-      eventName = 'loadeddata';
-    }
-
-    /**
      * Compose tag with defined attributes
      *
      * @type {Element}
      */
-    this.nodes.imageEl = make(tag, this.CSS.imageEl, attributes);
+    this.nodes.imageEl = make('IMG', this.CSS.imageEl, attributes);
 
     /**
      * Add load event listener
@@ -214,14 +245,38 @@ export default class Ui {
   }
 
   /**
-   * Shows caption input
+   * Shows quote input
    *
-   * @param {string} text - caption text
+   * @param {string} text - quote text
    * @returns {void}
    */
-  fillCaption(text) {
-    if (this.nodes.caption) {
-      this.nodes.caption.innerHTML = text;
+  fillQuote(text) {
+    if (this.nodes.quote) {
+      this.nodes.quote.innerHTML = text;
+    }
+  }
+
+  /**
+   * Shows author name input
+   *
+   * @param {string} text - author name
+   * @returns {void}
+   */
+  fillAuthorName(text) {
+    if (this.nodes.authorName) {
+      this.nodes.authorName.value = text;
+    }
+  }
+
+  /**
+   * Shows author info input
+   *
+   * @param {string} text - author info
+   * @returns {void}
+   */
+  fillAuthorInfo(text) {
+    if (this.nodes.authorInfo) {
+      this.nodes.authorInfo.value = text;
     }
   }
 
@@ -237,17 +292,6 @@ export default class Ui {
         this.nodes.wrapper.classList.toggle(`${this.CSS.wrapper}--${Ui.status[statusType]}`, status === Ui.status[statusType]);
       }
     }
-  }
-
-  /**
-   * Apply visual representation of activated tune
-   *
-   * @param {string} tuneName - one of available tunes {@link Tunes.tunes}
-   * @param {boolean} status - true for enable, false for disable
-   * @returns {void}
-   */
-  applyTune(tuneName, status) {
-    this.nodes.wrapper.classList.toggle(`${this.CSS.wrapper}--${tuneName}`, status);
   }
 }
 
