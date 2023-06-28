@@ -18,7 +18,7 @@
  *
  * It will expose 8008 port, so you can pass http://localhost:8008 with the Tools config:
  *
- * image: {
+ * quote: {
  *   class: QuoteAdvanced,
  *   config: {
  *     endpoints: {
@@ -46,13 +46,15 @@ import Uploader from './uploader';
 import { IconQuote } from '@codexteam/icons';
 
 /**
- * @typedef {object} ImageConfig
+ * @typedef {object} QuoteAdvancedConfig
  * @description Config supported by Tool
  * @property {object} endpoints - upload endpoints
  * @property {string} endpoints.byFile - upload by file
  * @property {string} field - field name for uploaded image
  * @property {string} types - available mime-types
- * @property {string} captionPlaceholder - placeholder for Caption field
+ * @property {string} quotePlaceholder - placeholder for quote field
+ * @property {string} authorNamePlaceholder - placeholder for author name field
+ * @property {string} authorInfoPlaceholder - placeholder for author info field
  * @property {object} additionalRequestData - any data to send with requests
  * @property {object} additionalRequestHeaders - allows to pass custom headers with Request
  * @property {string} buttonContent - overrides for Select File button
@@ -87,7 +89,7 @@ export default class QuoteAdvanced {
   /**
    * @param {object} tool - tool properties got from editor.js
    * @param {QuoteAdvancedToolData} tool.data - previously saved data
-   * @param {ImageConfig} tool.config - user config for Tool
+   * @param {QuoteAdvancedConfig} tool.config - user config for Tool
    * @param {object} tool.api - Editor.js API
    * @param {boolean} tool.readOnly - read-only mode flag
    */
@@ -176,7 +178,7 @@ export default class QuoteAdvanced {
    * @public
    */
   validate(savedData) {
-    return savedData.file && savedData.file.url;
+    return savedData.quote || savedData.authorName;
   }
 
   /**
@@ -191,9 +193,9 @@ export default class QuoteAdvanced {
     const authorName = this.ui.nodes.authorName;
     const authorInfo = this.ui.nodes.authorInfo;
 
-    this._data.quote = quote.innerHTML;
-    this._data.authorName = authorName.value;
-    this._data.authorInfo = authorInfo.value;
+    this._data.quote = quote.innerHTML.trim();
+    this._data.authorName = authorName.value.trim();
+    this._data.authorInfo = authorInfo.value.trim();
 
     return this.data;
   }

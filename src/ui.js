@@ -8,9 +8,9 @@ import { make } from './utils/dom';
  */
 export default class Ui {
   /**
-   * @param {object} ui - image tool Ui module
+   * @param {object} ui - Quote Advanced tool Ui module
    * @param {object} ui.api - Editor.js API
-   * @param {ImageConfig} ui.config - user config
+   * @param {QuoteAdvancedConfig} ui.config - user config
    * @param {Function} ui.onSelectFile - callback for clicks on Select file button
    * @param {Function} ui.onDeleteFile - callback for clicks on Delete file button
    */
@@ -125,7 +125,7 @@ export default class Ui {
   /**
    * Renders tool UI
    *
-   * @param {ImageToolData} toolData - saved tool data
+   * @param {QuoteAdvancedToolData} toolData - saved tool data
    * @returns {Element}
    */
   render(toolData) {
