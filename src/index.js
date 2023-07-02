@@ -178,7 +178,7 @@ export default class QuoteAdvanced {
    * @public
    */
   validate(savedData) {
-    return savedData.quote || savedData.authorName;
+    return savedData.quote.length !== 0;
   }
 
   /**
