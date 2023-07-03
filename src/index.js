@@ -167,7 +167,7 @@ export default class QuoteAdvanced {
    * @returns {boolean}
    */
   static get enableLineBreaks() {
-    return true;
+    return false;
   }
 
   /**
@@ -198,6 +198,17 @@ export default class QuoteAdvanced {
     this._data.authorInfo = authorInfo.value.trim();
 
     return this.data;
+  }
+
+  /**
+   * Sanitizer rules
+   */
+  static get sanitize() {
+    return {
+      quote: {
+        br: true,
+      }
+    };
   }
 
   /**
