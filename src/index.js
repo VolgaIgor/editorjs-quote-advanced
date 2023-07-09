@@ -207,7 +207,9 @@ export default class QuoteAdvanced {
     return {
       quote: {
         br: true,
-      }
+      },
+      authorName: true,
+      authorInfo: true
     };
   }
 
